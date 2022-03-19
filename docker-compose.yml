@@ -1,0 +1,106 @@
+version: "3.9"
+
+services:
+    api:
+        build:
+            context: .
+            dockerfile: ./docker/local/django/Dockerfile
+        command: /start
+        volumes:
+            - .:/app
+            - static_volume:/app/staticfiles
+            - media_volume:/app/mediafiles
+        expose:
+            - "8000"
+        env_file:
+            - .env
+        depends_on:
+            - postgres-db
+            - redis
+        networks:
+            - organicFood-react
+
+    client:
+        build:
+            context: ./client
+            dockerfile: Dockerfile.dev
+        restart: on-failure
+        volumes:
+            - ./client:/app
+            - /app/node_modules
+        networks:
+            - organicFood-react
+
+    postgres-db:
+        image: postgres:12.0-alpine
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data/
+        environment:
+            - POSTGRES_USER=${POSTGRES_USER}
+            - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            - POSTGRES_DB=${POSTGRES_DB}
+        networks:
+            - organicFood-react
+
+    redis:
+        image: redis:5-alpine
+        networks:
+            - organicFood-react
+
+    celery_worker:
+        build:
+            context: .
+            dockerfile: ./docker/local/django/Dockerfile
+        command: /start-celeryworker
+        volumes:
+            - .:/app
+        env_file:
+            - .env
+        depends_on:
+            - redis
+            - postgres-db
+        networks:
+            - organicFood-react
+
+    flower:
+        build:
+            context: .
+            dockerfile: ./docker/local/django/Dockerfile
+        command: /start-flower
+        volumes:
+            - .:/app
+        env_file:
+            - .env
+        ports:
+            - "5557:5555"
+        depends_on:
+            - redis
+            - postgres-db
+        networks:
+            - organicFood-react
+
+    nginx:
+        restart: always
+        depends_on:
+            - api
+        volumes:
+            - static_volume:/app/staticfiles
+            - media_volume:/app/mediafiles
+        build:
+            context: ./docker/local/nginx
+            dockerfile: Dockerfile
+        ports:
+            - "8080:80"
+        networks:
+            - organicFood-react
+
+networks:
+    organicFood-react:
+        driver: bridge
+
+volumes:
+    postgres_data:
+    static_volume:
+    media_volume:

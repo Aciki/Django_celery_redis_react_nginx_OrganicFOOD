@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -o errexit
+
+set -o nounset
+
+watchmedo auto-restart -d organicFood/ -p "*.py" -- celery worker -A organicFood --loglevel=info
